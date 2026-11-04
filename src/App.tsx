@@ -47,12 +47,33 @@ export default function App() {
   const [userEmail, setUserEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [favorites, setFavorites] = useState<string[]>([])
+  const [restaurantData, setRestaurantData] = useState<Restaurant[]>(restaurants)
+  const [dishData, setDishData] = useState<Dish[]>(dishes)
   const [cart, setCart] = useState<Record<string, number>>({})
   const [cartOpen, setCartOpen] = useState(false)
   const [mobileMenu, setMobileMenu] = useState(false)
 
   useEffect(() => {
     if (!supabase) return
+    Promise.all([
+      supabase.from('restaurants').select('*'),
+      supabase.from('menu_items').select('*').eq('available', true),
+    ]).then(([restaurantResult, menuResult]) => {
+      if (restaurantResult.data?.length) {
+        setRestaurantData(restaurantResult.data.map((r: any) => ({
+          id: r.id, name: r.name, cuisine: r.cuisine, description: r.description ?? '',
+          image: r.image_url ?? '', rating: String(r.rating ?? '4.5'),
+          time: r.delivery_minutes ?? '20–30 min', price: r.price_level ?? '$', featured: !!r.featured,
+        })))
+      }
+      if (menuResult.data?.length) {
+        setDishData(menuResult.data.map((d: any) => ({
+          id: d.id, restaurantId: d.restaurant_id, name: d.name, description: d.description ?? '',
+          category: d.category ?? 'Popular', price: Number(d.price), image: d.image_url ?? '',
+          vegetarian: !!d.is_vegetarian, popular: !!d.is_popular,
+        })))
+      }
+    })
     supabase.auth.getSession().then(({ data }) => setUserEmail(data.session?.user.email ?? ''))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUserEmail(session?.user.email ?? '')
@@ -61,13 +82,13 @@ export default function App() {
   }, [])
 
   const categories = ['All', 'Indian', 'Italian', 'Healthy', 'Japanese']
-  const filtered = useMemo(() => restaurants.filter(r =>
+  const filtered = useMemo(() => restaurantData.filter(r =>
     (category === 'All' || r.cuisine.toLowerCase().includes(category.toLowerCase())) &&
     (r.name + ' ' + r.cuisine + ' ' + r.description).toLowerCase().includes(query.toLowerCase())
   ), [category, query])
   const cartCount = Object.values(cart).reduce((sum, count) => sum + count, 0)
-  const cartTotal = dishes.reduce((sum, dish) => sum + dish.price * (cart[dish.id] || 0), 0)
-  const menuItems = selected ? dishes.filter(d => d.restaurantId === selected.id) : []
+  const cartTotal = dishData.reduce((sum, dish) => sum + dish.price * (cart[dish.id] || 0), 0)
+  const menuItems = selected ? dishData.filter(d => d.restaurantId === selected.id) : []
 
   async function authenticate(event: React.FormEvent) {
     event.preventDefault()
@@ -140,7 +161,7 @@ export default function App() {
 
       {modal && <div className="overlay auth-overlay" onClick={() => setModal(null)}><section className="auth-modal" onClick={e => e.stopPropagation()}><button className="close-button dark-close" onClick={() => setModal(null)}><X size={19}/></button><div className="auth-icon"><LockKeyhole size={23}/></div><div className="eyebrow">WELCOME TO FOODIEHUB</div><h2>{modal === 'login' ? 'Good to see you.' : 'Join the table.'}</h2><p>{modal === 'login' ? 'Log in to save your favorite places.' : 'Create an account and keep your favorites close.'}</p><form onSubmit={authenticate}><label>Email address<input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com"/></label><label>Password<input type="password" minLength={6} required value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 6 characters"/></label><button className="submit-button" disabled={busy}>{busy ? 'Please wait…' : modal === 'login' ? 'Log in' : 'Create account'} <ArrowRight size={16}/></button></form>{authMessage && <div className="auth-message">{authMessage}</div>}<div className="auth-switch">{modal === 'login' ? 'New to FoodieHub?' : 'Already have an account?'} <button onClick={() => { setModal(modal === 'login' ? 'signup' : 'login'); setAuthMessage('') }}>{modal === 'login' ? 'Create an account' : 'Log in'}</button></div></section></div>}
 
-      {cartOpen && <div className="overlay cart-overlay" onClick={() => setCartOpen(false)}><section className="cart-panel" onClick={e => e.stopPropagation()}><div className="cart-heading"><div><span className="eyebrow">YOUR PICKS</span><h2>Your bag <span>({cartCount})</span></h2></div><button className="icon-button" onClick={() => setCartOpen(false)}><X/></button></div>{cartCount === 0 ? <div className="empty-cart"><ShoppingBag size={35}/><h3>Your bag is taking a break.</h3><p>Add a dish or two from a restaurant menu.</p></div> : <><div className="cart-items">{dishes.filter(d => cart[d.id]).map(d => <div className="cart-line" key={d.id}><img src={d.image} alt=""/><div><b>{d.name}</b><small>${d.price.toFixed(2)} each</small><div className="quantity"><button onClick={() => setCart(c => ({ ...c, [d.id]: Math.max(0, (c[d.id] || 0) - 1) }))}>−</button><span>{cart[d.id]}</span><button onClick={() => addToCart(d.id)}>+</button></div></div><strong>${(d.price * cart[d.id]).toFixed(2)}</strong></div>)}</div><div className="cart-total"><span>Estimated total</span><b>${cartTotal.toFixed(2)}</b></div><p className="cart-disclaimer">Demo cart only — checkout and payments are not enabled.</p></>}</section></div>}
+      {cartOpen && <div className="overlay cart-overlay" onClick={() => setCartOpen(false)}><section className="cart-panel" onClick={e => e.stopPropagation()}><div className="cart-heading"><div><span className="eyebrow">YOUR PICKS</span><h2>Your bag <span>({cartCount})</span></h2></div><button className="icon-button" onClick={() => setCartOpen(false)}><X/></button></div>{cartCount === 0 ? <div className="empty-cart"><ShoppingBag size={35}/><h3>Your bag is taking a break.</h3><p>Add a dish or two from a restaurant menu.</p></div> : <><div className="cart-items">{dishData.filter(d => cart[d.id]).map(d => <div className="cart-line" key={d.id}><img src={d.image} alt=""/><div><b>{d.name}</b><small>${d.price.toFixed(2)} each</small><div className="quantity"><button onClick={() => setCart(c => ({ ...c, [d.id]: Math.max(0, (c[d.id] || 0) - 1) }))}>−</button><span>{cart[d.id]}</span><button onClick={() => addToCart(d.id)}>+</button></div></div><strong>${(d.price * cart[d.id]).toFixed(2)}</strong></div>)}</div><div className="cart-total"><span>Estimated total</span><b>${cartTotal.toFixed(2)}</b></div><p className="cart-disclaimer">Demo cart only — checkout and payments are not enabled.</p></>}</section></div>}
 
       {mobileMenu && <div className="mobile-menu"><button onClick={() => { setModal('login'); setMobileMenu(false) }}>Log in</button><button onClick={() => { setCartOpen(true); setMobileMenu(false) }}>Your bag ({cartCount})</button></div>}
     </div>
