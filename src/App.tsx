@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import {
-  ArrowRight, Bookmark, Check, ChefHat, Clock3, Flame, Heart, Leaf,
+  ArrowRight, ChefHat, Clock3, Flame, Heart, Leaf,
   LockKeyhole, LogIn, MapPin, Menu, Search, ShoppingBag, Star, UserRound, X,
 } from 'lucide-react'
 
