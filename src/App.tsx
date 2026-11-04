@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import {
   ArrowRight, ChefHat, Clock3, Flame, Heart, Leaf,
@@ -51,6 +51,15 @@ export default function App() {
   const [cartOpen, setCartOpen] = useState(false)
   const [mobileMenu, setMobileMenu] = useState(false)
 
+  useEffect(() => {
+    if (!supabase) return
+    supabase.auth.getSession().then(({ data }) => setUserEmail(data.session?.user.email ?? ''))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserEmail(session?.user.email ?? '')
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
   const categories = ['All', 'Indian', 'Italian', 'Healthy', 'Japanese']
   const filtered = useMemo(() => restaurants.filter(r =>
     (category === 'All' || r.cuisine.toLowerCase().includes(category.toLowerCase())) &&
@@ -72,11 +81,16 @@ export default function App() {
       : await supabase.auth.signInWithPassword({ email, password })
     if (result.error) setAuthMessage(result.error.message)
     else {
-      setUserEmail(email)
+      setUserEmail(result.data.session?.user.email ?? '')
       setAuthMessage(modal === 'signup' ? 'Account created! Check your email if confirmation is enabled.' : 'You are now signed in.')
       if (modal === 'login') setModal(null)
     }
     setBusy(false)
+  }
+
+  async function signOut() {
+    if (supabase) await supabase.auth.signOut()
+    setUserEmail('')
   }
 
   function toggleFavorite(id: string) {
@@ -93,7 +107,7 @@ export default function App() {
         <div className="location"><MapPin size={16}/><span>Discover great food near you</span></div>
         <div className="header-actions">
           <button className="icon-button cart-button" onClick={() => setCartOpen(true)} aria-label="Open cart"><ShoppingBag size={19}/>{cartCount > 0 && <b className="cart-count">{cartCount}</b>}</button>
-          {userEmail ? <button className="account-button" onClick={() => setUserEmail('')}><UserRound size={17}/><span>Sign out</span></button> : <button className="login-button" onClick={() => { setModal('login'); setAuthMessage('') }}><LogIn size={17}/> Log in</button>}
+          {userEmail ? <button className="account-button" onClick={() => void signOut()}><UserRound size={17}/><span>Sign out</span></button> : <button className="login-button" onClick={() => { setModal('login'); setAuthMessage('') }}><LogIn size={17}/> Log in</button>}
           <button className="icon-button mobile-toggle" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle menu"><Menu size={21}/></button>
         </div>
       </header>
