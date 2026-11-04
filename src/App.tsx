@@ -85,7 +85,7 @@ export default function App() {
   const filtered = useMemo(() => restaurantData.filter(r =>
     (category === 'All' || r.cuisine.toLowerCase().includes(category.toLowerCase())) &&
     (r.name + ' ' + r.cuisine + ' ' + r.description).toLowerCase().includes(query.toLowerCase())
-  ), [category, query])
+  ), [category, query, restaurantData])
   const cartCount = Object.values(cart).reduce((sum, count) => sum + count, 0)
   const cartTotal = dishData.reduce((sum, dish) => sum + dish.price * (cart[dish.id] || 0), 0)
   const menuItems = selected ? dishData.filter(d => d.restaurantId === selected.id) : []
